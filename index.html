@@ -44,7 +44,9 @@
     { value: "circle", label: "円" },
     { value: "square", label: "正方形" },
     { value: "hexagon-h", label: "六角形（横向き）" },
-    { value: "hexagon-v", label: "六角形（縦向き）" }
+    { value: "hexagon-v", label: "六角形（縦向き）" },
+    { value: "octagon", label: "正八角形（頂点上）" },
+    { value: "octagon-flat", label: "正八角形（平面上）" }
   ];
   const gridOptions = ["square", "triangle", "diamond"];
   const canvas = document.getElementById("canvas");
@@ -59,15 +61,15 @@
   let layers = [
     { 
       id: 0, shape: "circle", size: 36, spacing: 60, color: "#a52a2a", grid: "square", shiftX: -30, shiftY: 0,
-      shadowEnabled: true, shadowOffsetX: 2.0, shadowOffsetY: 2.0, shadowBlur: 4.0, shadowColor: "#000000", shadowOpacity: 0.5
+      visible: true, shadowEnabled: true, shadowOffsetX: 2.0, shadowOffsetY: 2.0, shadowBlur: 0, shadowColor: "#000000", shadowOpacity: 0.5
     },
     { 
       id: 1, shape: "square", size: 115, spacing: 120, color: "#fffacd", grid: "diamond", shiftX: 0, shiftY: 0,
-      shadowEnabled: true, shadowOffsetX: 3.0, shadowOffsetY: 3.0, shadowBlur: 6.0, shadowColor: "#000000", shadowOpacity: 0.3
+      visible: true, shadowEnabled: true, shadowOffsetX: 3.0, shadowOffsetY: 3.0, shadowBlur: 0, shadowColor: "#000000", shadowOpacity: 0.3
     },
     { 
       id: 2, shape: "circle", size: 68, spacing: 60, color: "#ff6347", grid: "diamond", shiftX: 0, shiftY: 0,
-      shadowEnabled: true, shadowOffsetX: 4.0, shadowOffsetY: 4.0, shadowBlur: 8.0, shadowColor: "#000000", shadowOpacity: 0.4
+      visible: true, shadowEnabled: true, shadowOffsetX: 4.0, shadowOffsetY: 4.0, shadowBlur: 0, shadowColor: "#000000", shadowOpacity: 0.4
     }
   ];
 
@@ -85,6 +87,7 @@
           grid: "square",
           shiftX: 0,
           shiftY: 0,
+          visible: true,
           shadowEnabled: true,
           shadowOffsetX: 2.0,
           shadowOffsetY: 2.0,
@@ -108,6 +111,7 @@
 
       div.innerHTML = `
         <strong>Layer ${layer.id + 1}</strong><br>
+        <input type="checkbox" data-id="${layer.id}" data-key="visible" ${layer.visible ? "checked" : ""}> 表示<br>
         Shape:
         <select data-id="${layer.id}" data-key="shape">
           ${shapeOptions.map(s => `<option value="${s.value}" ${s.value === layer.shape ? "selected" : ""}>${s.label}</option>`).join("")}
@@ -139,7 +143,7 @@
           const id = parseInt(e.target.dataset.id);
           const key = e.target.dataset.key;
           
-          if (key === "shadowEnabled") {
+          if (key === "shadowEnabled" || key === "visible") {
             layers[id][key] = e.target.checked;
           } else if (["size", "spacing", "shiftX", "shiftY"].includes(key)) {
             layers[id][key] = parseInt(e.target.value) || 0;
@@ -225,6 +229,10 @@
           shapeElem = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
           const points = hexPoints(px, py, layer.size / 2, layer.shape === "hexagon-v");
           shapeElem.setAttribute("points", points);
+        } else if (layer.shape === "octagon" || layer.shape === "octagon-flat") {
+          shapeElem = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+          const points = octagonPoints(px, py, layer.size / 2, layer.shape === "octagon-flat");
+          shapeElem.setAttribute("points", points);
         }
 
         shapeElem.setAttribute("fill", "black");
@@ -287,12 +295,15 @@
     const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     canvas.appendChild(defs);
 
-    // 各レイヤーについて、影→本体の順で描画
+    // 各レイヤーについて、影→本体の順で描画（表示されているもののみ）
     layers.forEach((layer, index) => {
+      if (!layer.visible) return; // 非表示のレイヤーはスキップ
+      
       // 影を先に描画（有効な場合）
       if (layer.shadowEnabled) {
         console.log(`Drawing shadow for layer ${index} with blur ${layer.shadowBlur}`);
         drawLayer(layer, index, true);
+
       }
       
       // 本体のレイヤーを描画
@@ -306,6 +317,19 @@
     const offset = vertical ? Math.PI / 6 : 0;
     for (let i = 0; i < 6; i++) {
       const angle = Math.PI / 3 * i + offset;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      pts.push(`${x},${y}`);
+    }
+    return pts.join(" ");
+  }
+
+  function octagonPoints(cx, cy, r, flat = false) {
+    let pts = [];
+    // flat=trueの場合は22.5度（π/8）回転させて平らな面が上になる
+    const offset = flat ? Math.PI / 8 : 0;
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.PI / 4 * i + offset;
       const x = cx + r * Math.cos(angle);
       const y = cy + r * Math.sin(angle);
       pts.push(`${x},${y}`);
